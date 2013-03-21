@@ -15,33 +15,70 @@ TOKEN_URL='https://accounts.google.com/o/oauth2/token'
 
 UPLOAD_URL='https://www.googleapis.com/upload/drive/v2/files'
 
+def GetRefreshTokenLocation():
+  config_directory = os.environ.get('XDG_CONFIG_HOME')
+  if config_directory is None:
+    config_directory = os.path.join(os.environ.get('HOME'), '.config')
+  if not os.path.exists(config_directory):
+    os.mkdir(config_directory)
+  return os.path.join(config_directory, 'google_drive_upload_token')
+
+def LoadRefreshToken():
+  path = GetRefreshTokenLocation()
+  try:
+    with open(path, 'r') as f:
+      return f.readline().rstrip()
+  except:
+    return None
+
+def SaveRefreshToken(token):
+  path = GetRefreshTokenLocation()
+  with open(path, 'w+') as f:
+    f.write(token)
+    f.write('\n')
+
 def GetAccessToken():
-  auth_request = requests.Request(
-      url=AUTH_URL,
-      params = {
-        'response_type': 'code',
-        'client_id': CLIENT_ID,
-        'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
-        'scope': SCOPES,
-      })
-  auth_request = auth_request.prepare()
+  refresh_token = LoadRefreshToken()
+  print '===%s===' % refresh_token
+  if refresh_token is None:
+    auth_request = requests.Request(
+        url=AUTH_URL,
+        params = {
+          'response_type': 'code',
+          'client_id': CLIENT_ID,
+          'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
+          'scope': SCOPES,
+        })
+    auth_request = auth_request.prepare()
+    print 'Open this url and paste the code back here:\n%s' % auth_request.url
+    code = sys.stdin.readline()
 
-  print 'Open this url and paste the code back here:\n%s' % auth_request.url
-
-  code = sys.stdin.readline()
-
-  token_response = requests.post(
-      TOKEN_URL,
-      data = {
-        'code': code,
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
-        'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
-        'grant_type': 'authorization_code',
-      })
+    token_response = requests.post(
+        TOKEN_URL,
+        data = {
+          'code': code,
+          'client_id': CLIENT_ID,
+          'client_secret': CLIENT_SECRET,
+          'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
+          'grant_type': 'authorization_code',
+        })
+    refresh_token = token_response.json()['refresh_token']
+  else:
+    token_response = requests.post(
+        TOKEN_URL,
+        data = {
+          'refresh_token': refresh_token,
+          'client_id': CLIENT_ID,
+          'client_secret': CLIENT_SECRET,
+          'grant_type': 'refresh_token',
+        })
+    print token_response
+    print token_response.text
 
   data = token_response.json()
   access_token = data['access_token']
+  if refresh_token is not None:
+    SaveRefreshToken(refresh_token)
   return access_token
 
 
