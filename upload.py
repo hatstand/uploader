@@ -3,6 +3,7 @@
 import json
 import os
 import requests
+import subprocess
 import sys
 
 CLIENT_ID='833751105344.apps.googleusercontent.com'
@@ -36,6 +37,15 @@ def SaveRefreshToken(token):
   with open(path, 'w+') as f:
     f.write(token)
     f.write('\n')
+
+def GetMimeTypeForFile(path):
+  try:
+    mime_type = subprocess.check_output(['file', '--mime-type', '-b', path])
+    if mime_type is None:
+      return 'application/octet-stream'
+    return mime_type.rstrip()
+  except:
+    return 'application/octet-stream'
 
 def GetAccessToken():
   refresh_token = LoadRefreshToken()
@@ -84,7 +94,8 @@ def GetAccessToken():
 
 def Upload(path, access_token):
   file_size = os.stat(path).st_size
-  print 'Uploading %s (%d)' % (os.path.basename(path), file_size)
+  mime_type = GetMimeTypeForFile(path)
+  print 'Uploading %s (%d) %s' % (os.path.basename(path), file_size, mime_type)
   session_start = requests.post(
       UPLOAD_URL,
       params = {
@@ -94,7 +105,7 @@ def Upload(path, access_token):
         'title': os.path.basename(path),
       }),
       headers = {
-        'X-Upload-Content-Type': 'audio/mpeg',
+        'X-Upload-Content-Type': mime_type,
         'X-Upload-Content-Length': file_size,
         'Content-Type': 'application/json',
         'Authorization': 'Bearer %s' % access_token,
@@ -112,7 +123,7 @@ def Upload(path, access_token):
           location,
           headers = {
             'Content-Length': end - start,
-            'Content-Type': 'application/octet-stream',
+            'Content-Type': mime_type,
             'Content-Range': 'bytes %d-%d/%d' % (start, end, file_size),
             'Authorization': 'Bearer %s' % access_token,
           },
