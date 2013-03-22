@@ -115,7 +115,7 @@ def Upload(path, access_token):
 
   location = session_start.headers['Location']
   with open(path) as f:
-    for i, start in enumerate(xrange(0, file_size - 1, 1024*512)):
+    for start in xrange(0, file_size - 1, 1024*512):
       end = min(start + 1024*512, file_size) - 1
       f.seek(start)
       print 'Uploading %d-%d of %d' % (start, end, file_size)
